@@ -269,80 +269,70 @@
   </div>
 
   <!-- TensorFlow and Teachable Machine scripts -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
-  <script type="text/javascript">
-    // Link to your model folder (same level as this HTML file)
-    const URL = "./my_model/";
+<script type="text/javascript">
+  // Folder that contains model.json, metadata.json, weights.bin
+  const URL = "./my_model/";
 
-    let model, webcam, labelContainer, maxPredictions;
+  let model, webcam, labelContainer, maxPredictions;
+  let modelLoaded = false;
 
-    // Load the image model and setup the webcam
-    async function init() {
+  async function init() {
+    try {
+      // 1. Setup webcam first so you always get the camera prompt
+      const flip = true;
+      webcam = new tmImage.Webcam(200, 200, flip);
+      await webcam.setup();          // this is where the browser asks for camera access
+      await webcam.play();
+      window.requestAnimationFrame(loop);
+
+      const webcamContainer = document.getElementById("webcam-container");
+      webcamContainer.innerHTML = "";
+      webcamContainer.appendChild(webcam.canvas);
+
+      labelContainer = document.getElementById("label-container");
+      labelContainer.innerHTML = "";
+
+      // 2. Now try to load the model
       const modelURL = URL + "model.json";
       const metadataURL = URL + "metadata.json";
 
       model = await tmImage.load(modelURL, metadataURL);
       maxPredictions = model.getTotalClasses();
 
-      const flip = true;
-      webcam = new tmImage.Webcam(200, 200, flip);
-      await webcam.setup();
-      await webcam.play();
-      window.requestAnimationFrame(loop);
-
-      document.getElementById("webcam-container").innerHTML = "";
-      document.getElementById("webcam-container").appendChild(webcam.canvas);
-      labelContainer = document.getElementById("label-container");
-      labelContainer.innerHTML = "";
       for (let i = 0; i < maxPredictions; i++) {
         labelContainer.appendChild(document.createElement("div"));
       }
-    }
 
-    async function loop() {
+      modelLoaded = true;
+    } catch (err) {
+      console.error("Error in init:", err);
+      const lc = document.getElementById("label-container");
+      lc.innerHTML = "Could not load model. Check that the my_model folder with model.json and metadata.json is in the same folder as index.html.";
+    }
+  }
+
+  async function loop() {
+    if (webcam) {
       webcam.update();
-      await predict();
-      window.requestAnimationFrame(loop);
-    }
-
-    // Run the webcam image through the image model
-    async function predict() {
-      const prediction = await model.predict(webcam.canvas);
-      for (let i = 0; i < maxPredictions; i++) {
-        const classPrediction =
-          prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-        labelContainer.childNodes[i].innerHTML = classPrediction;
+      if (modelLoaded) {
+        await predict();
       }
     }
+    window.requestAnimationFrame(loop);
+  }
 
-    // Are you Lueken check
-    function checkName() {
-      const input = document.getElementById("nameInput");
-      const result = document.getElementById("nameResult");
-      const name = input.value.trim().toLowerCase();
-
-      result.className = "";
-
-      if (!name) {
-        result.textContent = "Please enter a name first.";
-        result.classList.add("maybe");
-        return;
-      }
-
-      // You can tweak this logic if you want
-      if (name.includes("lueken") || name === "mr lueken" || name === "adam lueken") {
-        result.textContent = "You are Lueken. Legendary status unlocked. 🦄🦆";
-        result.classList.add("lueken");
-      } else if (name === "adam" || name === "mr l") {
-        result.textContent = "You might be Lueken. The ducks are suspicious. 🤔🦆";
-        result.classList.add("maybe");
-      } else {
-        result.textContent = "You are not Lueken, but you can still love ducks and unicorns. 💖";
-        result.classList.add("not-lueken");
-      }
+  async function predict() {
+    const prediction = await model.predict(webcam.canvas);
+    for (let i = 0; i < maxPredictions; i++) {
+      const classPrediction =
+        prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+      labelContainer.childNodes[i].innerHTML = classPrediction;
     }
-  </script>
+  }
+</script>
+
 </body>
 </html>

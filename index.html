@@ -1,59 +1,348 @@
-<div>Teachable Machine Image Model</div>
-<button type="button" onclick="init()">Start</button>
-<div id="webcam-container"></div>
-<div id="label-container"></div>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-<script type="text/javascript">
-    // More API functions here:
-    // https://github.com/googlecreativelab/teachablemachine-community/tree/master/libraries/image
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Ducks, Unicorns, and Lueken Check</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    // the link to your model provided by Teachable Machine export panel
+  <style>
+    :root {
+      --bg1: #fdf7ff;
+      --bg2: #e3f7ff;
+      --accent: #ff8fd8;
+      --accent2: #8fd8ff;
+      --card: #ffffffcc;
+      --shadow: 0 8px 20px rgba(51,51,51,0.1);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at top left, var(--bg1), var(--bg2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #app {
+      position: relative;
+      z-index: 2;
+      max-width: 700px;
+      width: 100%;
+      background: var(--card);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 22px 22px 26px;
+      backdrop-filter: blur(10px);
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: clamp(1.6rem, 3vw, 2.1rem);
+    }
+
+    .subtitle {
+      margin: 0 0 18px;
+      font-size: 0.95rem;
+      color: #444;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.9fr);
+      gap: 18px;
+    }
+
+    @media (max-width: 720px) {
+      body {
+        padding: 12px;
+      }
+      #app {
+        padding: 16px;
+      }
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 14px 14px 16px;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.04);
+    }
+
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 1.1rem;
+    }
+
+    .card p {
+      margin: 0 0 10px;
+      font-size: 0.9rem;
+      color: #555;
+    }
+
+    button {
+      margin: 8px 0 10px;
+      padding: 9px 16px;
+      font-size: 0.95rem;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      font-weight: 600;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 14px rgba(0,0,0,0.18);
+    }
+
+    button:active {
+      transform: translateY(0);
+      box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+    }
+
+    #webcam-container {
+      display: flex;
+      justify-content: center;
+      margin-top: 8px;
+    }
+
+    #webcam-container canvas {
+      border-radius: 12px;
+      border: 3px solid var(--accent2);
+    }
+
+    #label-container {
+      margin-top: 8px;
+      font-size: 0.9rem;
+      text-align: left;
+    }
+
+    #label-container div {
+      padding: 2px 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.85rem;
+      background: rgba(255,255,255,0.7);
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-top: 3px;
+    }
+
+    .badge span {
+      font-size: 1.1rem;
+    }
+
+    .name-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .name-row input {
+      flex: 1;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid #ccc;
+      font-size: 0.95rem;
+    }
+
+    #nameResult {
+      margin-top: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    #nameResult.lueken {
+      color: #16a34a;
+    }
+
+    #nameResult.not-lueken {
+      color: #dc2626;
+    }
+
+    #nameResult.maybe {
+      color: #f97316;
+    }
+
+    /* Flying ducks and unicorns */
+
+    .floaty {
+      position: absolute;
+      font-size: 2.4rem;
+      pointer-events: none;
+      opacity: 0.85;
+      animation: floaty 18s linear infinite;
+    }
+
+    .floaty.duck {
+      animation-duration: 16s;
+    }
+
+    .floaty.u1 { top: 8%; left: -10%; }
+    .floaty.u2 { top: 70%; left: -18%; }
+    .floaty.d1 { top: 25%; right: -12%; }
+    .floaty.d2 { top: 82%; right: -20%; }
+
+    @keyframes floaty {
+      0% {
+        transform: translateX(0) translateY(0) rotate(0deg);
+      }
+      25% {
+        transform: translateX(30vw) translateY(-10px) rotate(4deg);
+      }
+      50% {
+        transform: translateX(55vw) translateY(6px) rotate(-3deg);
+      }
+      75% {
+        transform: translateX(80vw) translateY(-4px) rotate(2deg);
+      }
+      100% {
+        transform: translateX(105vw) translateY(0) rotate(0deg);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Flying friends -->
+  <div class="floaty u1">🦄</div>
+  <div class="floaty u2">🦄</div>
+  <div class="floaty duck d1">🦆</div>
+  <div class="floaty duck d2">🦆</div>
+
+  <div id="app">
+    <h1>Teachable Machine - Ducks and Unicorns Lab</h1>
+    <p class="subtitle">
+      Turn on the webcam, test your model, and find out if you are Lueken or not.
+    </p>
+
+    <div class="layout">
+      <!-- Left card - webcam and predictions -->
+      <div class="card">
+        <h2>Image Model</h2>
+        <p>
+          Click Start, allow the webcam, then show it your duck and unicorn poses or images.
+        </p>
+        <div class="badge">
+          <span>🪄</span> Powered by Teachable Machine
+        </div>
+
+        <button type="button" onclick="init()">Start webcam model</button>
+        <div id="webcam-container"></div>
+        <div id="label-container"></div>
+      </div>
+
+      <!-- Right card - Are you Lueken -->
+      <div class="card">
+        <h2>Are you Lueken?</h2>
+        <p>Type your name and we will reveal the truth.</p>
+
+        <div class="name-row">
+          <input id="nameInput" type="text" placeholder="Enter your name" />
+          <button type="button" onclick="checkName()">Check</button>
+        </div>
+        <div id="nameResult"></div>
+
+        <p style="margin-top: 12px; font-size: 0.85rem; color:#666;">
+          Bonus challenge: train a class called "Lueken" in Teachable Machine and see if your model agrees.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TensorFlow and Teachable Machine scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+  <script type="text/javascript">
+    // Link to your model folder (same level as this HTML file)
     const URL = "./my_model/";
 
     let model, webcam, labelContainer, maxPredictions;
 
     // Load the image model and setup the webcam
     async function init() {
-        const modelURL = URL + "model.json";
-        const metadataURL = URL + "metadata.json";
+      const modelURL = URL + "model.json";
+      const metadataURL = URL + "metadata.json";
 
-        // load the model and metadata
-        // Refer to tmImage.loadFromFiles() in the API to support files from a file picker
-        // or files from your local hard drive
-        // Note: the pose library adds "tmImage" object to your window (window.tmImage)
-        model = await tmImage.load(modelURL, metadataURL);
-        maxPredictions = model.getTotalClasses();
+      model = await tmImage.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
 
-        // Convenience function to setup a webcam
-        const flip = true; // whether to flip the webcam
-        webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
-        await webcam.setup(); // request access to the webcam
-        await webcam.play();
-        window.requestAnimationFrame(loop);
+      const flip = true;
+      webcam = new tmImage.Webcam(200, 200, flip);
+      await webcam.setup();
+      await webcam.play();
+      window.requestAnimationFrame(loop);
 
-        // append elements to the DOM
-        document.getElementById("webcam-container").appendChild(webcam.canvas);
-        labelContainer = document.getElementById("label-container");
-        for (let i = 0; i < maxPredictions; i++) { // and class labels
-            labelContainer.appendChild(document.createElement("div"));
-        }
+      document.getElementById("webcam-container").innerHTML = "";
+      document.getElementById("webcam-container").appendChild(webcam.canvas);
+      labelContainer = document.getElementById("label-container");
+      labelContainer.innerHTML = "";
+      for (let i = 0; i < maxPredictions; i++) {
+        labelContainer.appendChild(document.createElement("div"));
+      }
     }
 
     async function loop() {
-        webcam.update(); // update the webcam frame
-        await predict();
-        window.requestAnimationFrame(loop);
+      webcam.update();
+      await predict();
+      window.requestAnimationFrame(loop);
     }
 
-    // run the webcam image through the image model
+    // Run the webcam image through the image model
     async function predict() {
-        // predict can take in an image, video or canvas html element
-        const prediction = await model.predict(webcam.canvas);
-        for (let i = 0; i < maxPredictions; i++) {
-            const classPrediction =
-                prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-            labelContainer.childNodes[i].innerHTML = classPrediction;
-        }
+      const prediction = await model.predict(webcam.canvas);
+      for (let i = 0; i < maxPredictions; i++) {
+        const classPrediction =
+          prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+        labelContainer.childNodes[i].innerHTML = classPrediction;
+      }
     }
-</script>
+
+    // Are you Lueken check
+    function checkName() {
+      const input = document.getElementById("nameInput");
+      const result = document.getElementById("nameResult");
+      const name = input.value.trim().toLowerCase();
+
+      result.className = "";
+
+      if (!name) {
+        result.textContent = "Please enter a name first.";
+        result.classList.add("maybe");
+        return;
+      }
+
+      // You can tweak this logic if you want
+      if (name.includes("lueken") || name === "mr lueken" || name === "adam lueken") {
+        result.textContent = "You are Lueken. Legendary status unlocked. 🦄🦆";
+        result.classList.add("lueken");
+      } else if (name === "adam" || name === "mr l") {
+        result.textContent = "You might be Lueken. The ducks are suspicious. 🤔🦆";
+        result.classList.add("maybe");
+      } else {
+        result.textContent = "You are not Lueken, but you can still love ducks and unicorns. 💖";
+        result.classList.add("not-lueken");
+      }
+    }
+  </script>
+</body>
+</html>
